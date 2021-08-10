@@ -16,6 +16,10 @@ In you private WiFi network, now you can install this app and all devices with t
 - Free of ads!! 🤩
 - No money spent on calls within your network.
 
+## Concerns / Todo
+- Secure data transmission
+- No permissions needed to send messages - this could be unwanted to some people
+
 # Flutter specific
 A few resources to get you started if this is your first Flutter project:
 
