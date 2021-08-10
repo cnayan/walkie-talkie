@@ -1,12 +1,14 @@
-package com.cnayan.walkie_talkie
+package com.cnayan.walkie_talkie.utils
 
 import android.util.Log
-import java.io.*
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.IOException
 import java.util.zip.*
 
-class CompressionUtils {
+class Compression {
     companion object {
-        private val TAG = "CompressionUtils"
+        private val TAG = "Compression"
 
         @Throws(Exception::class)
         fun compressGZip(bytes: ByteArray): ByteArray? {
@@ -44,7 +46,7 @@ class CompressionUtils {
 //                outStr.add(line)
 //            }
 
-            var out = gis.readBytes();
+            var out = gis.readBytes()
             gis.close()
 
             Log.d(TAG, "Output length : " + out.size)

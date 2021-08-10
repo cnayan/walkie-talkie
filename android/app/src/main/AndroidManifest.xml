@@ -55,7 +55,7 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
-        <receiver android:name=".RestartServiceReceiver">
+        <receiver android:name=".RestartServiceBroadcastReceiver">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
@@ -63,7 +63,7 @@
             </intent-filter>
         </receiver>
 
-        <service android:name=".StickyService">
+        <service android:name=".WalkieTalkieForegroundService">
         </service>
 
     </application>

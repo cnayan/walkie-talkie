@@ -4,54 +4,41 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import com.github.druk.dnssd.BrowseListener
-import com.github.druk.dnssd.DNSSDService
+import com.cnayan.walkie_talkie.utils.MDNSSD
+import com.cnayan.walkie_talkie.utils.SoundRecorder
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers.IO
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
-class MainActivity : FlutterActivity(), BrowseListener {
-    private lateinit var _mnsdMethodChannel: MethodChannel
+class MainActivity : FlutterActivity() {
+    private lateinit var _deviceDiscoveryMethodChannel: MethodChannel
     private lateinit var _recordingMethodChannel: MethodChannel
-    private var _devices: ArrayList<String> = ArrayList()
     private val _soundRecorder: SoundRecorder = SoundRecorder()
 
     companion object {
-        private const val NSD_PUBLISH_CHANNEL: String = "com.cnayan.walkie-talkie/nsd-publish"
-        private const val AUDIO_PUBLISH_CHANNEL: String = "com.cnayan.walkie-talkie/audio-publish"
+        private const val AUDIO_PUBLISH_METHOD_CHANNEL: String =
+            "com.cnayan.walkie-talkie/audio-publish"
+        private const val NSD_PUBLISH_METHOD_CHANNEL: String =
+            "com.cnayan.walkie-talkie/nsd-publish"
         private const val TAG = "MainActivity"
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        _mnsdMethodChannel = MethodChannel(
-            flutterEngine!!.dartExecutor.binaryMessenger,
-            NSD_PUBLISH_CHANNEL
-        )
+        setupMDNSChannel()
+        setupRecordingChannel()
 
+        startForegroundService()
+    }
+
+    private fun setupRecordingChannel() {
         _recordingMethodChannel = MethodChannel(
             flutterEngine!!.dartExecutor.binaryMessenger,
-            AUDIO_PUBLISH_CHANNEL
+            AUDIO_PUBLISH_METHOD_CHANNEL
         )
-
-        _mnsdMethodChannel.setMethodCallHandler(object : MethodChannel.MethodCallHandler {
-            override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-                when (call.method) {
-                    "getDevices" -> {
-                        _devices = ArrayList(_devices.distinct())
-                        result.success(_devices)
-                    }
-                    else -> {
-                        result.notImplemented()
-                    }
-                }
-            }
-        })
 
         _recordingMethodChannel.setMethodCallHandler(object : MethodChannel.MethodCallHandler {
             override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
@@ -79,49 +66,32 @@ class MainActivity : FlutterActivity(), BrowseListener {
                 }
             }
         })
-
-        val self = this
-        CoroutineScope(IO).launch {
-            startMyService()
-            Utils.Instance.registerDeviceDiscoveryListener(context, self)
-        }
     }
 
-    private fun startMyService() {
+    private fun setupMDNSChannel() {
+        _deviceDiscoveryMethodChannel = MethodChannel(
+            flutterEngine!!.dartExecutor.binaryMessenger,
+            NSD_PUBLISH_METHOD_CHANNEL
+        )
+
+        _deviceDiscoveryMethodChannel.setMethodCallHandler(object :
+            MethodChannel.MethodCallHandler {
+            override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
+                when (call.method) {
+                    "getDevices" -> {
+                        result.success(MDNSSD.devices.toList())
+                    }
+                    else -> {
+                        result.notImplemented()
+                    }
+                }
+            }
+        })
+    }
+
+    private fun startForegroundService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(Intent(this, StickyService::class.java))
+            startForegroundService(Intent(this, WalkieTalkieForegroundService::class.java))
         }
-    }
-
-    override fun serviceFound(
-        browser: DNSSDService?,
-        flags: Int,
-        ifIndex: Int,
-        serviceName: String?,
-        regType: String?,
-        domain: String?,
-    ) {
-        Log.d(TAG, "Found $serviceName")
-        if (serviceName?.isNotEmpty() == true) {
-            _devices.add(serviceName)
-        }
-    }
-
-    override fun serviceLost(
-        browser: DNSSDService?,
-        flags: Int,
-        ifIndex: Int,
-        serviceName: String?,
-        regType: String?,
-        domain: String?,
-    ) {
-        Log.d(TAG, "Lost $serviceName")
-        if (serviceName?.isNotEmpty() == true) {
-            _devices.remove(serviceName)
-        }
-    }
-
-    override fun operationFailed(service: DNSSDService, errorCode: Int) {
-        Log.e("TAG", "error: $errorCode")
     }
 }

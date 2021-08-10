@@ -10,19 +10,24 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkRequest
 
-import com.cnayan.walkie_talkie.RestartServiceReceiver.Companion.CHANNEL_ID
-import com.github.druk.dnssd.BrowseListener
-import com.github.druk.dnssd.DNSSDService
+class WalkieTalkieForegroundService : Service() {
+    private val TAG = "WalkieTalkieForegroundService"
 
-class StickyService : Service() {
-    private val TAG = "StickyService"
+    companion object {
+        @JvmStatic
+        var CHANNEL_ID: String = "StickyServiceChannel"
+    }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "Nayan: onStartCommand")
+        Log.d(TAG, "onStartCommand")
 
         createNotificationChannelsAndServers()
 
         return START_NOT_STICKY
+    }
+
+    override fun onBind(intent: Intent?): IBinder? {
+        return null
     }
 
     private fun createNotificationChannelsAndServers() {
@@ -47,6 +52,14 @@ class StickyService : Service() {
         }
     }
 
+    private fun enqueueJob() {
+        val startServersWorkRequest: WorkRequest =
+            OneTimeWorkRequestBuilder<ServerWorker>().build()
+        WorkManager
+            .getInstance(applicationContext)
+            .enqueue(startServersWorkRequest)
+    }
+
     private fun showIntent() {
         val notificationIntent = Intent(this, MainActivity::class.java)
         val pendingIntent: PendingIntent = PendingIntent.getActivity(
@@ -62,17 +75,5 @@ class StickyService : Service() {
             .build()
 
         startForeground(1, notification)
-    }
-
-    private fun enqueueJob() {
-        val startServersWorkRequest: WorkRequest =
-            OneTimeWorkRequestBuilder<ServerWorker>().build()
-        WorkManager
-            .getInstance(applicationContext)
-            .enqueue(startServersWorkRequest)
-    }
-
-    override fun onBind(intent: Intent?): IBinder? {
-        return null
     }
 }

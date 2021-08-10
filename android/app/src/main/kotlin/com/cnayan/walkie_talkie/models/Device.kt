@@ -1,4 +1,4 @@
-package com.cnayan.walkie_talkie
+package com.cnayan.walkie_talkie.models
 
 class Device(var name: String, var ip: String, var id: String) {
     companion object {

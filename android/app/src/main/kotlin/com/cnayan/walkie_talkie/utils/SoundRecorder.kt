@@ -1,4 +1,4 @@
-package com.cnayan.walkie_talkie
+package com.cnayan.walkie_talkie.utils
 
 import android.media.AudioFormat
 import android.media.AudioRecord
@@ -33,29 +33,29 @@ class SoundRecorder {
             BUFFER_SIZE_RECORDING)
 
         if (audioRecord == null || audioRecord!!.state != AudioRecord.STATE_INITIALIZED) {
-            Log.e(TAG, "error initializing")
+            Log.e(TAG,
+                "Error initializing recorder: (audioRecord == null) || (audioRecord!!.state != AudioRecord.STATE_INITIALIZED)")
             return
         }
 
         audioRecord!!.startRecording()
         recording = true
         Log.d(TAG, "Recording started!")
-        //Toast.makeText(this, "Recording started!", Toast.LENGTH_SHORT).show()
 
-        _emitAudioData()
+        emitAudioData()
     }
 
     fun stopRecording() {
         if (recording) {
             audioRecord!!.stop()
             audioRecord!!.release()
-            audioRecord = null;
+            audioRecord = null
             recording = false
             Log.d(TAG, "Recording stopped!")
         }
     }
 
-    private fun _emitAudioData() { // to be called in a Runnable for a Thread created after call to startRecording()
+    private fun emitAudioData() { // to be called in a Runnable for a Thread created after call to startRecording()
         if (recording) {
             CoroutineScope(IO).launch {
                 while (recording && listener != null) {

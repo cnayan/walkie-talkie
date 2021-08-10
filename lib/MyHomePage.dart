@@ -49,12 +49,14 @@ class _MyHomePageState extends State<MyHomePage> {
     _open();
 
     _setupAudioRecorder();
+
+    Future.delayed(Duration(seconds: 1)).then((value) => _scanLAN());
   }
 
-  @override
-  dispose() {
-    super.dispose();
-  }
+  // @override
+  // dispose() {
+  //   super.dispose();
+  // }
 
   void _getIP() async {
     final NetworkInfo ni = NetworkInfo();
@@ -157,8 +159,6 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   Fn? getRecorderFn(int index) {
-    print('tapped - getRecorderFn');
-
     if (!_recorderIsInited) {
       return null;
     }
@@ -184,17 +184,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
     if (socket != null) {
       try {
-        final bytes = audio.audioData;
-        print("Original bytes length: ${bytes.length}");
-
-        var gzipBytes = GZipEncoder().encode(bytes, level: Deflate.BEST_SPEED);
+        var gzipBytes = _compressBytes(deviceBytes, audio.audioData);
         if (gzipBytes != null) {
-          print("After GZip, bytes length: ${gzipBytes.length}");
-
-          var b = <int>[];
-          b.add(deviceBytes.length);
-          b.addAll(deviceBytes);
-          b.addAll(gzipBytes);
+          print("After compression, bytes length: ${gzipBytes.length}");
 
           socket.listen((List<int> event) {
             if (event.length > 0) {
@@ -202,8 +194,8 @@ class _MyHomePageState extends State<MyHomePage> {
             }
           });
 
-          print("Sending ${b.length} bytes");
-          socket.add(b);
+          print("Sending ${gzipBytes.length} bytes");
+          socket.add(gzipBytes);
         }
       } catch (err) {
         print("Error: " + err.toString());
@@ -212,6 +204,17 @@ class _MyHomePageState extends State<MyHomePage> {
         socket.close();
       }
     }
+  }
+
+  List<int>? _compressBytes(deviceBytes, audioData) {
+    final bytes = <int>[];
+    bytes.add(deviceBytes.length);
+    bytes.addAll(deviceBytes);
+    bytes.addAll(audioData);
+
+    print("Before compression, total bytes length: ${bytes.length}");
+
+    return GZipEncoder().encode(bytes, level: Deflate.BEST_SPEED);
   }
 
   // ====================================================================
