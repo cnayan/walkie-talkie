@@ -18,28 +18,25 @@ package com.cnayan.walkie_talkie
  */
 
 import android.content.Context
-import android.net.nsd.NsdManager
-import android.net.nsd.NsdServiceInfo
-import android.os.Build
 import android.util.Log
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import com.github.druk.dnssd.*
+import org.jetbrains.annotations.NotNull
 
 
 class NsdHelper(private var _context: Context) {
-    private val _broadcaster: LocalBroadcastManager
-    private var _nsdManager: NsdManager
+//    private val _broadcaster: LocalBroadcastManager
+//    private var _nsdManager: NsdManager
 
     //    private var _resolveListener: NsdManager.ResolveListener? = null
 //    private var _discoveryListener: NsdManager.DiscoveryListener? = null
-    private var _registrationListener: NsdManager.RegistrationListener? = null
+//    private var _registrationListener: NsdManager.RegistrationListener? = null
 
     //    private var _chosenServiceInfo: NsdServiceInfo? = null
-    private var _serviceName = ""
+//    private var _serviceName = ""
 
     init {
-        _nsdManager = _context.getSystemService(Context.NSD_SERVICE) as NsdManager
-        _broadcaster = LocalBroadcastManager.getInstance(_context)
+//        _nsdManager = _context.getSystemService(Context.NSD_SERVICE) as NsdManager
+        //_broadcaster = LocalBroadcastManager.getInstance(_context)
     }
 
     companion object {
@@ -51,27 +48,45 @@ class NsdHelper(private var _context: Context) {
         // rectify that problem
 //        const val SERVICE_TYPE_PLUS_DOT = SERVICE_TYPE + "."
         const val TAG = "NsdHelper"
-    }
+        private var _browseListener: BrowseListener? = null
+        private var dnssd: DNSSDBindable? = null
 
-    fun registerService(serviceName: String, port: Int) {
-        try {
-            val dnssd: DNSSD = DNSSDBindable(_context)
-            // "_rxdnssd._tcp"
-            dnssd.register(serviceName, SERVICE_TYPE, port,
-                object : RegisterListener {
-                    override fun serviceRegistered(
-                        registration: DNSSDRegistration, flags: Int,
-                        serviceName: String, regType: String, domain: String
-                    ) {
-                        Log.i("TAG", "Register successfully ")
-                    }
+        fun registerService(
+            @NotNull context: Context,
+            serviceName: String,
+            port: Int,
+        ) {
+            try {
+                // "_rxdnssd._tcp"
+                dnssd = dnssd ?: DNSSDBindable(context)
+                dnssd!!.register(serviceName, SERVICE_TYPE, port,
+                    object : RegisterListener {
+                        override fun serviceRegistered(
+                            registration: DNSSDRegistration, flags: Int,
+                            serviceName: String, regType: String, domain: String,
+                        ) {
+                            Log.i("TAG", "Register successfully ")
+                        }
 
-                    override fun operationFailed(service: DNSSDService, errorCode: Int) {
-                        Log.e("TAG", "error $errorCode")
-                    }
-                })
-        } catch (e: DNSSDException) {
-            Log.e("TAG", "error", e)
+                        override fun operationFailed(service: DNSSDService, errorCode: Int) {
+                            Log.e("TAG", "error $errorCode")
+                        }
+                    })
+            } catch (e: DNSSDException) {
+                Log.e("TAG", "NSD Registration - error", e)
+            }
+        }
+
+        fun findDevice(@NotNull context: Context, @NotNull browseListener: BrowseListener) {
+            if (_browseListener != null) return
+
+            try {
+                _browseListener = browseListener
+                dnssd = dnssd ?: DNSSDBindable(context)
+                dnssd!!.browse(SERVICE_TYPE, browseListener)
+            } catch (e: DNSSDException) {
+                Log.e(TAG, "error", e)
+            }
         }
     }
 
@@ -103,22 +118,22 @@ class NsdHelper(private var _context: Context) {
 //        )
 //    }
 
-    fun registerService_good(serviceName: String, port: Int) {
-        tearDown() // Cancel any previous registration request
-        initializeRegistrationListener()
-
-        this._serviceName = serviceName
-
-        val serviceInfo = NsdServiceInfo()
-        serviceInfo.port = port
-        serviceInfo.serviceName = serviceName
-        serviceInfo.serviceType = SERVICE_TYPE
-
-        Log.v(TAG, Build.MANUFACTURER + " registering service: " + port)
-        _nsdManager.registerService(
-            serviceInfo, NsdManager.PROTOCOL_DNS_SD, _registrationListener
-        )
-    }
+//    fun registerService_good(serviceName: String, port: Int) {
+//        tearDown() // Cancel any previous registration request
+//        initializeRegistrationListener()
+//
+//        this._serviceName = serviceName
+//
+//        val serviceInfo = NsdServiceInfo()
+//        serviceInfo.port = port
+//        serviceInfo.serviceName = serviceName
+//        serviceInfo.serviceType = SERVICE_TYPE
+//
+//        Log.v(TAG, Build.MANUFACTURER + " registering service: " + port)
+//        _nsdManager.registerService(
+//            serviceInfo, NsdManager.PROTOCOL_DNS_SD, _registrationListener
+//        )
+//    }
 
 //    private fun stopDiscovery() {
 //        if (_discoveryListener != null) {
@@ -131,16 +146,16 @@ class NsdHelper(private var _context: Context) {
 //        }
 //    }
 
-    fun tearDown() {
-        if (_registrationListener != null) {
-            try {
-                _nsdManager.unregisterService(_registrationListener)
-            } finally {
-            }
-
-            _registrationListener = null
-        }
-    }
+//    fun tearDown() {
+//        if (_registrationListener != null) {
+//            try {
+//                _nsdManager.unregisterService(_registrationListener)
+//            } finally {
+//            }
+//
+//            _registrationListener = null
+//        }
+//    }
 
 //    private fun initializeDiscoveryListener() {
 //        _discoveryListener = object : NsdManager.DiscoveryListener {
@@ -197,31 +212,31 @@ class NsdHelper(private var _context: Context) {
 //        }
 //    }
 
-    private fun initializeRegistrationListener() {
-        _registrationListener = object : NsdManager.RegistrationListener {
-            override fun onServiceRegistered(nsdServiceInfo: NsdServiceInfo) {
-                _serviceName = nsdServiceInfo.serviceName
-                Log.d(TAG, "Service registered: $nsdServiceInfo")
-//                NotificationToast.showToast(_context, "Service registered")
-            }
-
-            override fun onRegistrationFailed(arg0: NsdServiceInfo, arg1: Int) {
-                Log.d(TAG, "Service registration failed: $arg1")
-//                NotificationToast.showToast(_context, "Service registration failed")
-            }
-
-            override fun onServiceUnregistered(arg0: NsdServiceInfo) {
-                Log.d(TAG, "Service unregistered: " + arg0.serviceName)
-//                NotificationToast.showToast(_context, "Service unregistered")
-            }
-
-            override fun onUnregistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
-                Log.d(
-                    TAG,
-                    "Service unregistration failed: $errorCode"
-                )
-//                NotificationToast.showToast(_context, "Service un-registration failed")
-            }
-        }
-    }
+//    private fun initializeRegistrationListener() {
+//        _registrationListener = object : NsdManager.RegistrationListener {
+//            override fun onServiceRegistered(nsdServiceInfo: NsdServiceInfo) {
+//                _serviceName = nsdServiceInfo.serviceName
+//                Log.d(TAG, "Service registered: $nsdServiceInfo")
+////                NotificationToast.showToast(_context, "Service registered")
+//            }
+//
+//            override fun onRegistrationFailed(arg0: NsdServiceInfo, arg1: Int) {
+//                Log.d(TAG, "Service registration failed: $arg1")
+////                NotificationToast.showToast(_context, "Service registration failed")
+//            }
+//
+//            override fun onServiceUnregistered(arg0: NsdServiceInfo) {
+//                Log.d(TAG, "Service unregistered: " + arg0.serviceName)
+////                NotificationToast.showToast(_context, "Service unregistered")
+//            }
+//
+//            override fun onUnregistrationFailed(serviceInfo: NsdServiceInfo, errorCode: Int) {
+//                Log.d(
+//                    TAG,
+//                    "Service unregistration failed: $errorCode"
+//                )
+////                NotificationToast.showToast(_context, "Service un-registration failed")
+//            }
+//        }
+//    }
 }

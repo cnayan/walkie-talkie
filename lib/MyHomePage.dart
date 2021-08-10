@@ -1,6 +1,3 @@
-// import 'dart:convert';
-// import 'dart:io';
-
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -8,18 +5,15 @@ import 'dart:typed_data';
 
 import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:sorted_list/sorted_list.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter_sound/flutter_sound.dart';
-import 'package:flutter_sound_platform_interface/flutter_sound_recorder_platform_interface.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:logger/logger.dart' show Level;
 import 'package:device_info_plus/device_info_plus.dart';
 
 import 'Device.dart';
 import 'Audio.dart';
-import 'NsdDiscoverer.dart';
+import 'Utils.dart';
 
 typedef Fn = void Function(int index);
 
@@ -33,30 +27,19 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  static const _mnsdMethodChannel = MethodChannel('com.cnayan.walkie-talkie/nsd-publish');
+  static const _recordingMethodChannel = MethodChannel('com.cnayan.walkie-talkie/audio-publish');
   String _model = "";
   String _ip = "";
 
   bool _busy = false, _show = false;
-  final _devices = SortedList<Device>((a, b) {
-    var n1 = 0;
-    if (a.name != null) {
-      n1 = int.parse(a.name!.substring(a.name!.lastIndexOf('.') + 1));
-    }
+  final _devices = SortedList<Device>((a, b) => a.name!.compareTo(b.name!));
 
-    var n2 = 0;
-    if (b.name != null) {
-      n2 = int.parse(b.name!.substring(b.name!.lastIndexOf('.') + 1));
-    }
-
-    return n1.compareTo(n2);
-  });
-
-  bool _playerIsInited = false;
-  FlutterSoundRecorder? _recorder = FlutterSoundRecorder(logLevel: Level.debug);
+  var isRecording = false;
+  Map<int, bool> recording = {};
   bool _recorderIsInited = false;
-  StreamSubscription? _mRecordingDataSubscription;
   List<Uint8List> sinkData = <Uint8List>[];
-  Audio? _audio = null;
+  Audio? _audio;
 
   @override
   initState() {
@@ -64,12 +47,13 @@ class _MyHomePageState extends State<MyHomePage> {
     _getModel();
     _getIP();
     _open();
+
+    _setupAudioRecorder();
   }
 
   @override
   dispose() {
     super.dispose();
-    NsdDiscoverer.stopDiscovering();
   }
 
   void _getIP() async {
@@ -91,104 +75,85 @@ class _MyHomePageState extends State<MyHomePage> {
       _devices.clear();
     });
 
-    _discover();
+    var devices = await _getNetworkDevices();
+    if (devices != null) {
+      setState(() {
+        _devices.clear();
+        _devices.addAll(devices);
+      });
+    }
 
-    await Future.delayed(Duration(milliseconds: 3000));
     _stopScan();
   }
 
-  void _stopScan() {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-
-    NsdDiscoverer.stopDiscovering();
-
+  Future _stopScan() async {
     setState(() {
       _busy = false;
     });
   }
 
-  Future<void> _openTheRecorder() async {
-    if (!kIsWeb) {
-      var status = await Permission.microphone.request();
-      if (status != PermissionStatus.granted) {
-        throw RecordingPermissionException('Microphone permission not granted');
-      }
-    }
-    await _recorder!.openAudioSession();
-    _recorderIsInited = true;
-  }
+  // Future<void> _openTheRecorder() async {
+  //   if (!kIsWeb) {
+  //     var status = await Permission.microphone.request();
+  //     if (status != PermissionStatus.granted) {
+  //       throw RecordingPermissionException('Microphone permission not granted');
+  //     }
+  //   }
+  //   await _recorder!.openAudioSession();
+  //   _recorderIsInited = true;
+  // }
 
   Future<void> _open() async {
     var status = await Permission.microphone.request();
     if (status != PermissionStatus.granted) {
-      throw RecordingPermissionException('Microphone permission not granted');
+      throw ErrorDescription('Microphone permission not granted');
     }
 
-    await _openTheRecorder();
+    _setupAudioRecorder();
     setState(() {
       _recorderIsInited = true;
     });
   }
 
-  Map<int, bool> recording = {};
+  void _setupAudioRecorder() {
+    _recordingMethodChannel.setMethodCallHandler((MethodCall call) async {
+      if (call.method == "audioBytes") {
+        print("Got audioBytes: ${call.arguments.length}");
+        Uint8List arr = Uint8List.fromList(call.arguments);
+        sinkData.add(arr);
+      }
+    });
+  }
 
   void recordAudio(int index) async {
-    if (!_recorder!.isStopped) {
+    print('tapped - recorder - recording');
+
+    if (isRecording) {
       return;
     }
 
-    // ignore: close_sinks
-    var recordingDataController = StreamController<Food>();
+    await _recordingMethodChannel.invokeMethod("startRecording");
 
     setState(() {
       recording[index] = true;
     });
-
-    _mRecordingDataSubscription = recordingDataController.stream.listen((buffer) {
-      if (buffer is FoodData) {
-        sinkData.add(buffer.data!);
-      }
-    });
-
-    print('tapped - recorder - playing');
-    await _recorder!.startRecorder(
-      // toFile: file,
-      toStream: recordingDataController.sink,
-      codec: Codec.pcm16,
-      audioSource: AudioSource.microphone,
-    );
   }
 
   void stopRecorder(int index) async {
-    await _recorder!.stopRecorder();
+    print('tapped - recorder - stopped');
+    await _recordingMethodChannel.invokeMethod("stopRecording");
 
     setState(() {
       recording[index] = false;
     });
 
-    print('tapped - recorder - stopped');
-
-    if (_mRecordingDataSubscription != null) {
-      await _mRecordingDataSubscription!.cancel();
-    }
-
-    _audio = Audio()..audioData = _reduce(sinkData);
+    _audio = Audio()..audioData = Utils.reduce(sinkData);
     _audio!.target = _devices[index];
     if (_audio!.audioData.isNotEmpty) {
       _sendFile(_audio!);
     }
 
-    sinkData = <Uint8List>[];
-  }
-
-  static List<int> _reduce(List<Uint8List> a) {
-    final arr = <int>[];
-    a.reduce((value, element) {
-      arr.addAll(value);
-      return element;
-    });
-
-    return arr;
+    sinkData.clear();
   }
 
   Fn? getRecorderFn(int index) {
@@ -198,7 +163,7 @@ class _MyHomePageState extends State<MyHomePage> {
       return null;
     }
 
-    return recording[index] == false ? recordAudio : stopRecorder;
+    return recording[index] == null || recording[index] == false ? recordAudio : stopRecorder;
   }
 
   Future<void> _sendFile(Audio audio) async {
@@ -430,27 +395,23 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  void _discover() {
-    NsdDiscoverer.findAsync(_ip, (host, added) {
-      if (added == true) {
-        setState(() {
-          recording[_devices.length] = false;
-          _devices.add(Device(host[0], host[1], host[2]));
-        });
-
-        print('Found device: $host');
-      } else {
-        int index = _devices.indexWhere((d) => d.name == host[0]);
-        if (index > -1) {
-          setState(() {
-            recording.removeWhere((key, value) => key == index);
-            _devices.removeAt(index);
-          });
-
-          print('Lost device: $host');
+  Future<List<Device>?> _getNetworkDevices() async {
+    try {
+      var deviceNames = await _mnsdMethodChannel.invokeMethod('getDevices');
+      var devices = <Device>[];
+      for (var deviceName in deviceNames) {
+        var a = Utils.splitDeviceName(deviceName);
+        if (_ip != a[1]) {
+          devices.add(Device(a[0], a[1], a[2]));
         }
       }
-    });
+
+      return devices;
+    } on PlatformException catch (e) {
+      print("Failed to interact with platform channel: '${e.message}'.");
+    }
+
+    return null;
   }
 
   Future _getModel() async {

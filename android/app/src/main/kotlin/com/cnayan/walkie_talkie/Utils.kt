@@ -3,13 +3,14 @@ package com.cnayan.walkie_talkie
 import android.content.Context
 import android.os.Build
 import android.util.Log
+import com.github.druk.dnssd.BrowseListener
 import java.net.InetAddress
 import java.net.NetworkInterface
 
 class Utils {
-    private constructor() {}
+    private constructor()
 
-    private var _helper: NsdHelper? = null
+//    private var _helper: NsdHelper? = null
 
 //    object : BroadcastReceiver() {
 //        fun onReceive(context: Context?, intent: Intent) {
@@ -68,10 +69,10 @@ class Utils {
 //        }
 //    }
 
-    fun startNSDService(applicationContext: Context, port: Int = 38512) {
-        if (_helper != null) return
-
-        _helper = NsdHelper(applicationContext)
+    fun registerNSDService(applicationContext: Context, port: Int = 38512) {
+//        if (_helper != null) return
+//
+//        _helper = NsdHelper(applicationContext)
 
         try {
             val deviceName: String = Build.MODEL
@@ -81,16 +82,22 @@ class Utils {
             val separator = 255.toChar()
             val name = "$deviceName$separator$ip$separator$deviceID"
 
-            //val wifi: WifiManager = applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager
-            _helper!!.registerService(name, port)
+            NsdHelper.registerService(applicationContext, name, port)
         } catch (ignored: java.lang.Exception) {
             Log.e(TAG, ignored.toString())
         }
     }
 
-    fun stopNSDService() {
-        _helper?.tearDown()
-        _helper = null
+//    fun stopNSDService() {
+//        _helper?.tearDown()
+//        _helper = null
+//    }
+
+    fun registerDeviceDiscoveryListener(
+        applicationContext: Context,
+        browseListener: BrowseListener,
+    ) {
+        NsdHelper.findDevice(applicationContext, browseListener)
     }
 
     companion object {

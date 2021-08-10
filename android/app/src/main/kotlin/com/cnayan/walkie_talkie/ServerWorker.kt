@@ -1,6 +1,7 @@
 package com.cnayan.walkie_talkie
 
 import android.annotation.SuppressLint
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -9,6 +10,7 @@ import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioTrack
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.VibrationEffect
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -44,9 +46,8 @@ class ServerWorker(appContext: Context, workerParams: WorkerParameters) :
                 acquire()
             }
 
-            Utils.Instance.startNSDService(applicationContext)
+            Utils.Instance.registerNSDService(applicationContext)
 
-//            startPingServer()
             startTcpServer()
 
             _started = true
@@ -71,18 +72,6 @@ class ServerWorker(appContext: Context, workerParams: WorkerParameters) :
 
     private fun audioDataReceived(bytes: ByteArray) {
         Log.d(TAG, "Data received - ${bytes.size}")
-
-//        val mAudioTrack = AudioTrack(
-//            AudioManager.STREAM_MUSIC,
-//            16000,
-//            AudioFormat.CHANNEL_OUT_MONO,
-//            AudioFormat.ENCODING_PCM_16BIT,
-//            bytes.size,
-//            AudioTrack.MODE_STREAM
-//        )
-//
-//        mAudioTrack.write(bytes, 0, bytes.size)
-//        mAudioTrack.play()
 
         var size = bytes[0].toInt()
         var deviceBytes = bytes.copyOfRange(1, size + 1)
@@ -124,11 +113,25 @@ class ServerWorker(appContext: Context, workerParams: WorkerParameters) :
 
         var n = "${host.name} (${host.ip})"
 
+        val manager: NotificationManager? =
+            applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager?
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && manager?.notificationChannels?.any { e -> e.id == NOTIFICATION_CHANNEL_ID } != true) {
+            var notificationChannel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "Walkie Talkie Audio Message Channel",
+                NotificationManager.IMPORTANCE_HIGH
+            )
+
+            notificationChannel.enableVibration(true)
+            manager?.createNotificationChannel(notificationChannel)
+        }
+
         val builder: NotificationCompat.Builder =
             NotificationCompat.Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification_icon) //set icon for notification
                 .setContentTitle("Walkie Talkie") //set title of notification
-                .setContentText("Message coming from ${n}") //this is notification message
+                .setContentText("Incoming message from $n") //this is notification message
                 .setAutoCancel(true) // makes auto cancel of notification
                 .setVibrate(pattern)
                 .setPriority(NotificationCompat.PRIORITY_DEFAULT) //set priority of notification
@@ -144,30 +147,7 @@ class ServerWorker(appContext: Context, workerParams: WorkerParameters) :
 
         builder.setContentIntent(pendingIntent)
 
-        val manager: NotificationManager? =
-            applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager?
-
         // Add as notification
         manager?.notify(0, builder.build())
-
-//        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-//            var notificationChannel = NotificationChannel(
-//                NOTIFICATION_CHANNEL_ID,
-//                "description",
-//                NotificationManager.IMPORTANCE_HIGH
-//            )
-//            notificationChannel.lightColor = Color.BLUE
-//            notificationChannel.enableVibration(true)
-//            var builder = Notification.Builder(applicationContext, NOTIFICATION_CHANNEL_ID)
-//                .setContentTitle(
-//                    "NOTIFICATION USING " +
-//                            "KOTLIN"
-//                ).setContentText("Test Notification")
-//                .setSmallIcon(R.drawable.ic_notification_icon)
-//                .setContentIntent(pendingIntent)
-//
-//            manager?.createNotificationChannel(notificationChannel)
-//            manager?.notify(0, builder.build())
-//        }
     }
 }

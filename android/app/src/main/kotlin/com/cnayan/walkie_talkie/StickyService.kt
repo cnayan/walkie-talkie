@@ -11,6 +11,8 @@ import androidx.work.WorkManager
 import androidx.work.WorkRequest
 
 import com.cnayan.walkie_talkie.RestartServiceReceiver.Companion.CHANNEL_ID
+import com.github.druk.dnssd.BrowseListener
+import com.github.druk.dnssd.DNSSDService
 
 class StickyService : Service() {
     private val TAG = "StickyService"
