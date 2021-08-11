@@ -10,8 +10,8 @@ import androidx.work.WorkerParameters
 import com.cnayan.walkie_talkie.models.Device
 import com.cnayan.walkie_talkie.servers.TcpFileServer
 import com.cnayan.walkie_talkie.utils.Compression
-import com.cnayan.walkie_talkie.utils.MDNSSD
 import com.cnayan.walkie_talkie.utils.NotificationHelper
+import com.cnayan.walkie_talkie.utils.network.service_discovery.NSD
 
 class ServerWorker(context: Context, workerParams: WorkerParameters) :
     Worker(context, workerParams) {
@@ -29,13 +29,12 @@ class ServerWorker(context: Context, workerParams: WorkerParameters) :
 
     private fun startServers() {
         if (!_started) {
-            MDNSSD(applicationContext).apply {
-                registerNSDService()
-                registerDeviceDiscoveryListener()
+            NSD(applicationContext).apply {
+                registerDevice()
+                startDiscovering()
             }
 
             startTcpServer()
-
             _started = true
         }
     }

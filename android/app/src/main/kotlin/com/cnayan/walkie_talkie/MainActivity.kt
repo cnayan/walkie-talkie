@@ -4,19 +4,18 @@ import android.content.Intent
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import com.cnayan.walkie_talkie.utils.MDNSSD
 import com.cnayan.walkie_talkie.utils.SoundRecorder
+import com.cnayan.walkie_talkie.utils.network.service_discovery.NSD
 import io.flutter.embedding.android.FlutterActivity
-import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers.Main
 import kotlinx.coroutines.launch
 
 class MainActivity : FlutterActivity() {
-    private lateinit var _deviceDiscoveryMethodChannel: MethodChannel
-    private lateinit var _recordingMethodChannel: MethodChannel
-    private val _soundRecorder: SoundRecorder = SoundRecorder()
+    private lateinit var deviceDiscoveryMethodChannel: MethodChannel
+    private lateinit var recordingMethodChannel: MethodChannel
+    private val soundRecorder: SoundRecorder = SoundRecorder()
 
     companion object {
         private const val AUDIO_PUBLISH_METHOD_CHANNEL: String =
@@ -28,6 +27,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setupMDNSChannel()
         setupRecordingChannel()
 
@@ -35,58 +35,53 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun setupRecordingChannel() {
-        _recordingMethodChannel = MethodChannel(
+        recordingMethodChannel = MethodChannel(
             flutterEngine!!.dartExecutor.binaryMessenger,
             AUDIO_PUBLISH_METHOD_CHANNEL
         )
 
-        _recordingMethodChannel.setMethodCallHandler(object : MethodChannel.MethodCallHandler {
-            override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-                when (call.method) {
-                    "startRecording" -> {
-                        _soundRecorder.listener = { bytes ->
-                            Log.d(TAG, "Recorder: Sending bytes to Flutter: ${bytes.size}")
-                            CoroutineScope(Main).launch {
-                                _recordingMethodChannel.invokeMethod("audioBytes", bytes)
-                            }
+        recordingMethodChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startRecording" -> {
+                    soundRecorder.listener = { bytes ->
+                        Log.d(TAG, "Recorder: Sending bytes to Flutter: ${bytes.size}")
+                        CoroutineScope(Main).launch {
+                            recordingMethodChannel.invokeMethod("audioBytes", bytes)
                         }
+                    }
 
-                        _soundRecorder.startRecording()
+                    soundRecorder.startRecording()
 
-                        result.success(true)
-                    }
-                    "stopRecording" -> {
-                        _soundRecorder.listener = null
-                        _soundRecorder.stopRecording()
-                        result.success(true)
-                    }
-                    else -> {
-                        result.notImplemented()
-                    }
+                    result.success(true)
+                }
+                "stopRecording" -> {
+                    soundRecorder.listener = null
+                    soundRecorder.stopRecording()
+                    result.success(true)
+                }
+                else -> {
+                    result.notImplemented()
                 }
             }
-        })
+        }
     }
 
     private fun setupMDNSChannel() {
-        _deviceDiscoveryMethodChannel = MethodChannel(
+        deviceDiscoveryMethodChannel = MethodChannel(
             flutterEngine!!.dartExecutor.binaryMessenger,
             NSD_PUBLISH_METHOD_CHANNEL
         )
 
-        _deviceDiscoveryMethodChannel.setMethodCallHandler(object :
-            MethodChannel.MethodCallHandler {
-            override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
-                when (call.method) {
-                    "getDevices" -> {
-                        result.success(MDNSSD.devices.toList())
-                    }
-                    else -> {
-                        result.notImplemented()
-                    }
+        deviceDiscoveryMethodChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "getDevices" -> {
+                    result.success(NSD.devices.toList())
+                }
+                else -> {
+                    result.notImplemented()
                 }
             }
-        })
+        }
     }
 
     private fun startForegroundService() {

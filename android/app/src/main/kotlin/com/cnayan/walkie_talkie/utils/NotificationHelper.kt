@@ -14,7 +14,7 @@ import com.cnayan.walkie_talkie.models.Device
 
 class NotificationHelper {
     companion object {
-        private val WALKIE_TALKIE_NOTIFICATION_CHANNEL_ID =
+        private const val WALKIE_TALKIE_NOTIFICATION_CHANNEL_ID =
             "com.cnayan.walkie_talkie/AudioMessageComingInChannel"
 
         fun addNotification(applicationContext: Context, host: Device) {

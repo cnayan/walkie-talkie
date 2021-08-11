@@ -1,7 +1,7 @@
 package com.cnayan.walkie_talkie.servers
 
 import android.util.Log
-import com.cnayan.walkie_talkie.utils.Network
+import com.cnayan.walkie_talkie.utils.network.Network
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -15,7 +15,6 @@ class TcpFileServer : Runnable {
     private val TAG = "TcpFileServer"
     private val stopServer: AtomicBoolean = AtomicBoolean(false)
     private val _ip: String = Network.getIPAddress(true) ?: "127.0.0.1"
-    private val _mac = ""
     var listener: ((ByteArray) -> Unit)? = null
 
     override fun run() {

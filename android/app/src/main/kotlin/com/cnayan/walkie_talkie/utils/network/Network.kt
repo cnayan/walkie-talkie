@@ -1,4 +1,4 @@
-package com.cnayan.walkie_talkie.utils
+package com.cnayan.walkie_talkie.utils.network
 
 import java.net.InetAddress
 import java.net.NetworkInterface
